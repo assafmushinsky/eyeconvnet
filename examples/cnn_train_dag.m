@@ -192,7 +192,7 @@ end
 numGpus = numel(params.gpus) ;
 if numGpus >= 1
   net.move('gpu') ;
-  state.momentum = cellfun(@gpuArray, state.momentum, 'uniformoutput', false) ;
+%   state.momentum = cellfun(@gpuArray, state.momentum, 'uniformoutput', false) ;
 end
 if numGpus > 1
   parserv = ParameterServer(params.parameterServer) ;

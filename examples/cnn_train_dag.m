@@ -9,6 +9,8 @@ function [net,stats] = cnn_train_dag(net, imdb, getBatch, varargin)
 % This file is part of the VLFeat library and is made available under
 % the terms of the BSD license (see the COPYING file).
 opts.useGpu = false ;
+addpath(fullfile(vl_rootnn, 'examples'));
+
 opts.expDir = fullfile('data','exp') ;
 opts.continue = true ;
 opts.batchSize = 256 ;
@@ -20,8 +22,19 @@ opts.prefetch = false ;
 opts.numEpochs = 300 ;
 opts.learningRate = 0.001 ;
 opts.weightDecay = 0.0005 ;
-opts.momentum = 0.9 ;
-opts.saveMomentum = true ;
+
+opts.solver = @solver.sgd; % Empty array - optimised SGD solver
+[opts, varargin] = vl_argparse(opts, varargin);
+if isempty(opts.solver)
+  opts.solverOpts.momentum = 0.9;
+else
+  assert(isa(opts.solver, 'function_handle') && nargout(opts.solver) == 2,...
+    'Invalid solver - a function handle with two outputs expected.');
+  % A call without any input arg - def opts
+  opts.solverOpts = opts.solver();
+end
+
+opts.saveSolverState = true ;
 opts.nesterovUpdate = false ;
 opts.randomSeed = 0 ;
 opts.profile = false ;
@@ -171,8 +184,8 @@ function [net, state] = processEpoch(net, state, params, mode)
 % spmd caller.
 
 % initialize with momentum 0
-if isempty(state) || isempty(state.momentum)
-  state.momentum = num2cell(zeros(1, numel(net.params))) ;
+if isempty(state) || isempty(state.solverState)
+  state.solverState = cell(1, numel(net.params)) ;
 end
 
 % move CNN  to GPU as needed
@@ -283,10 +296,10 @@ if params.profile
     mpiprofile off ;
   end
 end
-if ~params.saveMomentum
-  state.momentum = [] ;
+if ~params.saveSolverState
+  state.solverState = [] ;
 else
-  state.momentum = cellfun(@gather, state.momentum, 'uniformoutput', false) ;
+  state.solverState = cellfun(@gather, state.solverState, 'uniformoutput', false) ;
 end
 
 net.reset() ;
@@ -317,28 +330,26 @@ for p=1:numel(net.params)
     case 'gradient'
       thisDecay = params.weightDecay * net.params(p).weightDecay ;
       thisLR = params.learningRate * net.params(p).learningRate ;
-
-      % Normalize gradient and incorporate weight decay.
-      parDer = vl_taccum(1/batchSize, parDer, ...
-                         thisDecay, net.params(p).value) ;
-
-      % Update momentum.
-      state.momentum{p} = vl_taccum(...
-        params.momentum, state.momentum{p}, ...
-        -1, parDer) ;
-
-      % Nesterov update (aka one step ahead).
-      if params.nesterovUpdate
-        delta = vl_taccum(...
-          params.momentum, state.momentum{p}, ...
-          -1, parDer) ;
+      
+      if isempty(params.solver)
+        if isempty(state.solverState{p})
+          state.solverState{p} = zeros(size(parDer), 'like', parDer);
+        end
+        
+        state.solverState{p} = vl_taccum(...
+          params.solverOpts.momentum,  state.solverState{p}, ...
+          - (1 / batchSize), parDer) ;
+        net.params(p).value = vl_taccum(...
+          (1 - thisLR * thisDecay / (1 - params.solverOpts.momentum)),  ...
+          net.params(p).value, ...
+          thisLR, state.solverState{p}) ;
       else
-        delta = state.momentum{p} ;
+        grad = (1 / batchSize) * parDer + thisDecay * net.params(p).value;
+        % call solver function to update weights
+        [net.params(p).value, state.solverState{p}] = ...
+          params.solver(net.params(p).value, state.solverState{p}, ...
+          grad, params.solverOpts, thisLR) ;
       end
-
-      % Update parameters.
-      net.params(p).value = vl_taccum(...
-        1,  net.params(p).value, thisLR, delta) ;
 
     case 'RMSprop' %http://cs231n.github.io/neural-networks-3/#ada
             

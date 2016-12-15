@@ -91,7 +91,7 @@ if strcmpi(opts.format,'digraph')
 end
 
 if ~isempty(opts.layers)
-  table = {'func', '-', 'type', 'inputs', 'outputs', 'params', 'pad', 'stride'} ;
+  table = {'func', '-', 'type', 'inputs', 'outputs', 'params', 'pad', 'stride', 'size'} ;
   for l = select(obj, 'layers', opts.layers)
     layer = obj.layers(l) ;
     table{l+1,1} = layer.name ;
@@ -109,6 +109,13 @@ if ~isempty(opts.layers)
       table{l+1,8} = pdims(layer.block.stride) ;
     else
       table{l+1,8} = 'n/a' ;
+    end
+    if isprop(layer.block, 'size')
+      table{l+1,9} = pdims(layer.block.size) ;
+    elseif isprop(layer.block, 'poolSize')
+      table{l+1,9} = pdims(layer.block.poolSize) ;
+    else
+      table{l+1,9} = 'n/a' ;
     end
   end
   str{end+1} = printtable(opts, table') ;

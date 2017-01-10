@@ -46,7 +46,6 @@ import matlab.unittest.constraints.* ;
 import matlab.unittest.selectors.* ;
 import matlab.unittest.plugins.TAPPlugin;
 import matlab.unittest.plugins.ToFile;
-addpath(fullfile(vl_rootnn, 'examples'));
 
 % Choose which tests to run
 sel = HasName(StartsWithSubstring(opts.command)) ;

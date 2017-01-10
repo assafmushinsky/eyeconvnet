@@ -8,9 +8,7 @@ function [net,stats] = cnn_train_dag(net, imdb, getBatch, varargin)
 %
 % This file is part of the VLFeat library and is made available under
 % the terms of the BSD license (see the COPYING file).
-
-addpath(fullfile(vl_rootnn, 'examples'));
-
+opts.useGpu = false ;
 opts.expDir = fullfile('data','exp') ;
 opts.continue = true ;
 opts.batchSize = 256 ;
@@ -22,19 +20,8 @@ opts.prefetch = false ;
 opts.numEpochs = 300 ;
 opts.learningRate = 0.001 ;
 opts.weightDecay = 0.0005 ;
-
-opts.solver = @solver.sgd; % Empty array - optimised SGD solver
-[opts, varargin] = vl_argparse(opts, varargin);
-if isempty(opts.solver)
-  opts.solverOpts.momentum = 0.9;
-else
-  assert(isa(opts.solver, 'function_handle') && nargout(opts.solver) == 2,...
-    'Invalid solver - a function handle with two outputs expected.');
-  % A call without any input arg - def opts
-  opts.solverOpts = opts.solver();
-end
-
-opts.saveSolverState = true ;
+opts.momentum = 0.9 ;
+opts.saveMomentum = true ;
 opts.nesterovUpdate = false ;
 opts.randomSeed = 0 ;
 opts.profile = false ;
@@ -124,7 +111,7 @@ for epoch=start+1:opts.numEpochs
 
   if opts.plotStatistics
     switchFigure(1) ; clf ;
-    maximize(1);
+%     maximize(1);
     plots = setdiff(...
       cat(2,...
       fieldnames(stats.train)', ...
@@ -184,14 +171,15 @@ function [net, state] = processEpoch(net, state, params, mode)
 % spmd caller.
 
 % initialize with momentum 0
-if isempty(state) || isempty(state.solverState)
-  state.solverState = cell(1, numel(net.params)) ;
+if isempty(state) || isempty(state.momentum)
+  state.momentum = num2cell(zeros(1, numel(net.params))) ;
 end
 
 % move CNN  to GPU as needed
 numGpus = numel(params.gpus) ;
 if numGpus >= 1
   net.move('gpu') ;
+  state.momentum = cellfun(@gpuArray, state.momentum, 'uniformoutput', false) ;
 end
 if numGpus > 1
   parserv = ParameterServer(params.parameterServer) ;
@@ -295,10 +283,10 @@ if params.profile
     mpiprofile off ;
   end
 end
-if ~params.saveSolverState
-  state.solverState = [] ;
+if ~params.saveMomentum
+  state.momentum = [] ;
 else
-  state.solverState = cellfun(@gather, state.solverState, 'uniformoutput', false) ;
+  state.momentum = cellfun(@gather, state.momentum, 'uniformoutput', false) ;
 end
 
 net.reset() ;
@@ -329,25 +317,28 @@ for p=1:numel(net.params)
     case 'gradient'
       thisDecay = params.weightDecay * net.params(p).weightDecay ;
       thisLR = params.learningRate * net.params(p).learningRate ;
-      
-      if isempty(params.solver)
-        if isempty(state.solverState{p})
-          state.solverState{p} = zeros(size(parDer), 'like', parDer);
+
+      if thisLR>0 || thisDecay>0
+        % Normalize gradient and incorporate weight decay.
+        parDer = vl_taccum(1/batchSize, parDer, ...
+                           thisDecay, net.params(p).value) ;
+
+        % Update momentum.
+        state.momentum{p} = vl_taccum(...
+          params.momentum, state.momentum{p}, ...
+          -1, parDer) ;
+
+        % Nesterov update (aka one step ahead).
+        if params.nesterovUpdate
+          delta = vl_taccum(...
+            params.momentum, state.momentum{p}, ...
+            -1, parDer) ;
+        else
+          delta = state.momentum{p} ;
         end
-        
-        state.solverState{p} = vl_taccum(...
-          params.solverOpts.momentum,  state.solverState{p}, ...
-          - (1 / batchSize), parDer) ;
+        % Update parameters.
         net.params(p).value = vl_taccum(...
-          (1 - thisLR * thisDecay / (1 - params.solverOpts.momentum)),  ...
-          net.params(p).value, ...
-          thisLR, state.solverState{p}) ;
-      else
-        grad = (1 / batchSize) * parDer + thisDecay * net.params(p).value;
-        % call solver function to update weights
-        [net.params(p).value, state.solverState{p}] = ...
-          params.solver(net.params(p).value, state.solverState{p}, ...
-          grad, params.solverOpts, thisLR) ;
+          1,  net.params(p).value, thisLR, delta) ;
       end
       
     case 'RMSprop' %http://cs231n.github.io/neural-networks-3/#ada
@@ -392,7 +383,7 @@ for p=1:numel(net.params)
            thisGrad=net.params(p).m./(sqrt(net.params(p).v)+eps);
            thisWeightDecay = params.weightDecay * net.params(p).weightDecay* net.params(p).value ;           
            net.params(p).value = net.params(p).value- thisLR*thisGrad -thisLR*thisWeightDecay;
-
+           
     otherwise
       error('Unknown training method ''%s'' for parameter ''%s''.', ...
         net.params(p).trainMethod, ...

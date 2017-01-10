@@ -1,6 +1,6 @@
 classdef nnmnist < nntest
   properties (TestParameter)
-    networkType = {'simplenn', 'dagnn'}
+    networkType = {'dagnn', 'simplenn'}
   end
 
   methods (TestClassSetup)

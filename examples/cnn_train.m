@@ -446,7 +446,6 @@ for l=numel(net.layers):-1:1
       % Standard gradient training.
       thisDecay = params.weightDecay * net.layers{l}.weightDecay(j) ;
       thisLR = params.learningRate * net.layers{l}.learningRate(j) ;
-      
       if isempty(params.solver)
         % Default solver is the optimised SGD
         if isempty(state.solverState{l}{j})

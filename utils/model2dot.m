@@ -33,7 +33,7 @@ end
 fprintf('Loading %s.\n', modelPath);
 obj = load(modelPath);
 
-if isstruct(obj.layers) % DagNN format
+if isstruct(obj.layers) % DAGnn format
   net = dagnn.DagNN.loadobj(obj);
 elseif iscell(obj.layers)
   net = dagnn.DagNN.fromSimpleNN(obj);
@@ -42,22 +42,13 @@ else
 end
 
 inputs = opts.inputs;
-if isempty(inputs)
-  inputs = {} ;
-  inputNames = net.getInputs() ;
-  for i = 1:numel(inputNames)
-    inputSize = [NaN NaN NaN NaN] ;
-    if isprop(net, 'meta') || isfield(net, 'meta')
-      if isfield(net.meta, 'inputs')
-        ii = find(strcmp(inputNames{i}, {net.meta.inputs.name})) ;
-        inputSize = net.meta.inputs(ii).size ;
-      elseif isfield(net.meta, 'normalization') && ...
-          (i == 1 || strcmp(inputNames{i}, 'data'))
-        inputSize = [net.meta.normalization.imageSize(1:3), 1] ;
-      end
-    end
-    inputs = {inputs{:}, inputNames{i}, inputSize} ;
-  end
+inputNames = net.getInputs();
+if isempty(inputs) && numel(inputNames) == 1 ...
+  && isfield(obj, 'meta') && isfield(obj.meta, 'normalization') ...
+  && isfield(obj.meta.normalization, 'imageSize')
+  inputSize = [obj.meta.normalization.imageSize(1:3), opts.batchSize];
+  fprintf('Input %s guessed to be: %s.\n', inputNames{1}, mat2str(inputSize));
+  inputs = {inputNames{1}, inputSize};
 end
 
 if isempty(inputs)

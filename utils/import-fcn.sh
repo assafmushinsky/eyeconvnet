@@ -71,7 +71,7 @@ then
             #PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp \
             $converter \
                 --caffe-variant=caffe_6e3916 \
-                --full-image-size=[500] \
+                --preproc=fcn \
 		--remove-dropout \
                 --remove-loss \
                 --average-value="${FCN_AVERAGE_COLOR}" \

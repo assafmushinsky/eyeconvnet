@@ -28,7 +28,6 @@ vl_nnnormalizelp.m \
 vl_nnpdist.m \
 vl_nnpool.m \
 vl_nnrelu.m \
-vl_nnroipool.m \
 vl_nnsigmoid.m \
 vl_nnsoftmax.m \
 vl_nnsoftmaxloss.m \

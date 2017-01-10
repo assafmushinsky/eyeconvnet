@@ -349,49 +349,6 @@ for p=1:numel(net.params)
           params.solver(net.params(p).value, state.solverState{p}, ...
           grad, params.solverOpts, thisLR) ;
       end
-      
-    case 'RMSprop' %http://cs231n.github.io/neural-networks-3/#ada
-            
-            thisLR = params.learningRate * net.params(p).learningRate ;           
-            eps=1e-8;
-            decayRate = 0.99;
-            if (isfield(net.params(p),'decayRate'))
-               decayRate=net.params(p).decayRate;
-            end    
-            if (~isfield(net.params(p),'cacheRMSprop') || isempty(net.params(p).cacheRMSprop))
-                net.params(p).cacheRMSprop=0;
-            end
-            
-            net.params(p).cacheRMSprop=decayRate*net.params(p).cacheRMSprop+(1-decayRate)*(((1 / batchSize) * net.params(p).der).^2);
-            thisWeightDecay = params.weightDecay * net.params(p).weightDecay* net.params(p).value ;
-            thisGrad=(1 / batchSize) * net.params(p).der./(sqrt( net.params(p).cacheRMSprop)+eps);
-            
-            net.params(p).value = net.params(p).value- thisLR*thisGrad-thisLR*thisWeightDecay;
-    case 'Adam' %http://cs231n.github.io/neural-networks-3/#ada           
-           thisLR = params.learningRate * net.params(p).learningRate ;            
-           beta1=0.9;
-           if (isfield(net.params(p),'beta1'))
-               beta1=net.params(p).beta1;
-           end
-           beta2=0.999;
-           if (isfield(net.params(p),'beta2'))
-               beta1=net.params(p).beta2;
-           end           
-           eps=1e-8;
-
-            if (~isfield(net.params(p),'m') || isempty(net.params(p).m))
-                net.params(p).m=0;
-            end
-            if (~isfield(net.params(p),'v') || isempty(net.params(p).v))
-                net.params(p).v=0;
-            end
-            
-           net.params(p).m=beta1*net.params(p).m+(1-beta1)*((1 / batchSize) * net.params(p).der);
-           net.params(p).v=beta2*net.params(p).v+(1-beta2)*(((1 / batchSize) * net.params(p).der).^2);
-           
-           thisGrad=net.params(p).m./(sqrt(net.params(p).v)+eps);
-           thisWeightDecay = params.weightDecay * net.params(p).weightDecay* net.params(p).value ;           
-           net.params(p).value = net.params(p).value- thisLR*thisGrad -thisLR*thisWeightDecay;
 
     otherwise
       error('Unknown training method ''%s'' for parameter ''%s''.', ...

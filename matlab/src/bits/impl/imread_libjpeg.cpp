@@ -68,6 +68,8 @@ vl::ErrorCode
 vl::ImageReader::Impl::readPixels(float * memory, char const * filename)
 {
   vl::ErrorCode error = vl::VLE_Success ;
+  int row_stride ;
+  const int blockSize = 32 ;
   char unsigned * pixels = NULL ;
   JSAMPARRAY scanlines = NULL ;
   bool requiresAbort = false ;
@@ -79,14 +81,11 @@ vl::ImageReader::Impl::readPixels(float * memory, char const * filename)
   FILE* fp = fopen(filename, "r") ;
   if (fp == NULL) {
     error = vl::VLE_Unknown ;
-    std::snprintf(lastErrorMessage,  sizeof(lastErrorMessage),
-                  "imread_libjpeg: unable to open %s", filename) ;
     return error ;
   }
 
   /* handle LibJPEG errors */
   if (setjmp(onJpegError)) {
-    requiresAbort = true;
     error = vl::VLE_Unknown ;
     std::snprintf(lastErrorMessage,  sizeof(lastErrorMessage),
                   "libjpeg: %s", jpegLastErrorMsg) ;
@@ -171,8 +170,6 @@ vl::ImageReader::Impl::readShape(vl::ImageShape & shape, char const * filename)
   FILE* fp = fopen(filename, "r") ;
   if (fp == NULL) {
     error = vl::VLE_Unknown ;
-    std::snprintf(lastErrorMessage,  sizeof(lastErrorMessage),
-                  "imread_libjpeg: unable to open %s", filename) ;
     return error ;
   }
 

@@ -153,8 +153,10 @@ for epoch=start+1:opts.numEpochs
       w = linspace(0.3,1,size(values,2));
       valm = sum(bsxfun(@times,values,w),2) ./ sum(w);
       vals = std(values,[],2);
-      ylim([min(valm) - max(vals), max(valm) + max(vals)])
-    
+      try
+          ylim([min(valm) - max(vals), max(valm) + max(vals)])
+      catch
+      end
       if ~isempty(opts.hardNegMining) && opts.hardNegMining.rate > 0 && mod(epoch,opts.hardNegMining.rate) == 0
         pause(0.5);
         imdb = opts.hardNegMining.hFunc(net,imdb,opts.hardNegMining);
@@ -472,7 +474,7 @@ if numGpus >= 1 && cold
   fprintf('%s: resetting GPU\n', mfilename)
   clearMex() ;
   if numGpus == 1
-%     gpuDevice(opts.gpus)
+    gpuDevice(opts.gpus)
   else
     spmd
       clearMex() ;

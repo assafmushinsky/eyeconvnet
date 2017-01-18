@@ -386,7 +386,7 @@ for l = 1:numel(net.layers)
   end
 end
 
-str{end+1} = sprintf('}\n') ;
+str{end+1} = sprintf('rankdir="LR"}\n') ;
 str = cat(2,str{:}) ;
 end
 
@@ -433,5 +433,6 @@ switch computer
     system(sprintf('display "%s"', out)) ;
   otherwise
     fprintf('PDF figure saved at "%s"\n', out) ;
+    winopen(out);
 end
 end

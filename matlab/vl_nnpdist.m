@@ -52,7 +52,8 @@ function [y1, y2] = vl_nnpdist(x, x0, p, varargin)
 % -------------------------------------------------------------------------
 %                                                             Parse options
 % -------------------------------------------------------------------------
-
+opts.clip=false;
+opts.clipValue=0;
 opts.noRoot = false ;
 opts.epsilon = 1e-6 ;
 opts.aggregate = false ;
@@ -99,6 +100,10 @@ if ~isempty(dzdy) && ~isempty(opts.hard_samples_percent)
     end
     th = prctile(absd,100-opts.hard_samples_percent);
     d = bsxfun(@times, d, absd >= th);
+end
+
+if (opts.clip && p==2)
+    d=max(abs(d)-opts.clipValue,0);
 end
 
 if ~opts.noRoot

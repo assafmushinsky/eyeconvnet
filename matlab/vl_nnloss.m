@@ -286,7 +286,7 @@ else
     case 'binaryerror'
       y = zerosLike(x) ;
     case 'binarylog'
-      y = - dzdy ./ (x + (c-1)*0.5) ;
+      y = - dzdy ./ ((x + (c-1)*0.5) + (c==0)) ;
     case 'logistic'
       % t = exp(-Y.*X) / (1 + exp(-Y.*X)) .* (-Y)
       % t = 1 / (1 + exp(Y.*X)) .* (-Y)

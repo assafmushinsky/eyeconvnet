@@ -22,6 +22,8 @@ opts.prefetch = false ;
 opts.numEpochs = 300 ;
 opts.learningRate = 0.001 ;
 opts.weightDecay = 0.0005 ;
+opts.preEpochCallbacks = {};
+opts.postEpochCallbacks = {};
 
 opts.solver = @solver.sgd; % Empty array - optimised SGD solver
 [opts, varargin] = vl_argparse(opts, varargin);
@@ -52,6 +54,8 @@ if isempty(opts.train), opts.train = find(imdb.images.set==1) ; end
 if isempty(opts.val), opts.val = find(imdb.images.set==2) ; end
 if isnan(opts.train), opts.train = [] ; end
 if isnan(opts.val), opts.val = [] ; end
+if ~iscell(opts.preEpochCallbacks), opts.preEpochCallbacks = {opts.preEpochCallbacks} ; end
+if ~iscell(opts.postEpochCallbacks), opts.postEpochCallbacks = {opts.postEpochCallbacks} ; end
 
 % -------------------------------------------------------------------------
 %                                                            Initialization
@@ -98,6 +102,11 @@ for epoch=start+1:opts.numEpochs
   params.imdb = imdb ;
   params.getBatch = getBatch ;
 
+  % Invoke pre-epoch callbacks, if any
+  for i = 1:length(opts.preEpochCallbacks)
+      [net, state, params] = opts.preEpochCallbacks{i}(net, state, params);
+  end
+  
   if numel(opts.gpus) <= 1
     [net, state] = processEpoch(net, state, params, 'train') ;
     [net, state] = processEpoch(net, state, params, 'val') ;
@@ -122,6 +131,11 @@ for epoch=start+1:opts.numEpochs
   clear lastStats ;
   saveStats(modelPath(epoch), stats) ;
 
+  % Invoke post-epoch callbacks, if any
+  for i = 1:length(opts.postEpochCallbacks)
+      [net, state, params] = opts.postEpochCallbacks{i}(net, state, params);
+  end
+  
   if opts.plotStatistics
     switchFigure(1) ; clf ;
     maximize(1);
@@ -473,12 +487,12 @@ end
 if numGpus >= 1 && cold
   fprintf('%s: resetting GPU\n', mfilename)
   clearMex() ;
-  if numGpus == 1
-    gpuDevice(opts.gpus)
-  else
-    spmd
-      clearMex() ;
-      gpuDevice(opts.gpus(labindex))
-    end
-  end
+%   if numGpus == 1
+%     gpuDevice(opts.gpus)
+%   else
+%     spmd
+%       clearMex() ;
+%       gpuDevice(opts.gpus(labindex))
+%     end
+%   end
 end

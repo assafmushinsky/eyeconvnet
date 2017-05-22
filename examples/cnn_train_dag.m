@@ -314,11 +314,24 @@ end
 if ~params.saveSolverState
   state.solverState = [] ;
 else
-  state.solverState = cellfun(@gather, state.solverState, 'uniformoutput', false) ;
+  state.solverState = cellfun(@gatherRecursively, state.solverState, 'uniformoutput', false) ;
 end
 
 net.reset() ;
 net.move('cpu') ;
+
+function S = gatherRecursively( S ) 
+if iscell(S)
+    for ii = 1:length(S)
+        S{ii} = gatherRecursively(S{ii});
+    end
+elseif isstruct(S)
+    for fn = fieldnames(S)'
+        S.(char(fn)) = gatherRecursively(S.(char(fn)));
+    end
+else
+    S = gather(S);
+end
 
 % -------------------------------------------------------------------------
 function state = accumulateGradients(net, state, params, batchSize, parserv)
@@ -487,12 +500,12 @@ end
 if numGpus >= 1 && cold
   fprintf('%s: resetting GPU\n', mfilename)
   clearMex() ;
-%   if numGpus == 1
-%     gpuDevice(opts.gpus)
-%   else
-%     spmd
-%       clearMex() ;
-%       gpuDevice(opts.gpus(labindex))
-%     end
-%   end
+  if numGpus == 1
+    gpuDevice(opts.gpus)
+  else
+    spmd
+      clearMex() ;
+      gpuDevice(opts.gpus(labindex))
+    end
+  end
 end

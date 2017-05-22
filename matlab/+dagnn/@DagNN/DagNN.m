@@ -141,6 +141,7 @@ classdef DagNN < matlab.mixin.Copyable
     setLayerOutput(obj, layer, outputs)
     setLayerParams(obj, layer, params)
     renameVar(obj, oldName, newName, varargin)
+    renameParam(obj, oldName, newName, varargin)
     rebuild(obj)
     net = toSimpleNN(dag, inputVar)
 

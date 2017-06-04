@@ -6,19 +6,31 @@ function [net, info] = cnn_cifar(varargin)
 % run(fullfile(fileparts(mfilename('fullpath')), ...
 %   '..', 'matconvnet','matlab', 'vl_setupnn.m')) ;
 
-opts.modelType = 'res' ;
+opts.modelType = 'oded' ;
+opts.normImdb = true;
 opts.depth=164;
-opts.GPU=[];
-opts.batchSize=100;
-opts.weightDecay=0.0001;
+opts.GPU=1;
+opts.batchSize=128;
+opts.weightDecay=0.00001;
 opts.momentum=0.9;
 opts.resConn = 1;
 opts.Nclass=10;
 opts.colorSpace = 'rgb';
 opts.resType = '131';
-opts.learningRate = [0.01*ones(1,3) 0.1*ones(1,80) 0.01*ones(1,10) 0.001*ones(1,20)] ;
-opts.k = [64 128 256 512];
+opts.learningRate = [0.01*ones(1,10) 0.001*ones(1,2) 0.01*ones(1,2) 0.001*ones(1,5) 0.01*ones(1,2) 0.001*ones(1,20)] ;
+opts.learningRate = [0.001*ones(1,2) opts.learningRate  0.005*ones(1,20) 0.001*ones(1,20)] ;
+% opts.learningRate = [0.0001*ones(1,4) 0.0001*ones(1,12) 0.001*ones(1,5)  0.001*ones(1,91-5-12-4) 0.0005*ones(1,30) 0.0001*ones(1,30)] ;
+% opts.learningRate = linspace(0.01,0.0001,150);
+% opts.k = [64 128 256 512];
+opts.k = [32 64 128 256];
 opts.usePad = true;
+opts.solver = @solver.adagrad;
+opts.solverOpts = opts.solver();
+% opts.solverOpts.rho = 0.8;
+
+
+opts.useQR = true;
+
 [opts, varargin] = vl_argparse(opts, varargin) ;
 
 datas='cifar';
@@ -38,11 +50,31 @@ switch opts.modelType
             padStr = '_noPad';
         end
         opts.expDir = sprintf(['data/%s_%d_%s_%d_%d_%d_%d' colorStr padStr],datas, opts.Nclass, opts.modelType,opts.k);
+    case 'oded'
+        padStr = '';
+        if ~opts.usePad
+            padStr = '_noPad';
+        end
+        qrStr = '';
+        if opts.useQR
+            qrStr = '_useSVD';
+        end
+        opts.expDir = sprintf('data/%s_%d_%s',datas, opts.Nclass, opts.modelType);
+        opts.expDir = [opts.expDir sprintf('_%d',opts.k) colorStr padStr qrStr '_largeSkip_addFC'];
 end
 
 [opts, varargin] = vl_argparse(opts, varargin) ;
 
 opts.dataDir = fullfile(vl_rootnn, 'data', datas) ;
+switch opts.Nclass
+    case 10
+        opts.dataDir = 'D:\Datasets\DetectionTrainDB\Cifar-10';
+    case 100
+        opts.dataDir = 'D:\Datasets\DetectionTrainDB\Cifar-100';
+end
+
+% gpuDevice(1)
+
 opts.imdbPath = fullfile(opts.expDir, 'imdb.mat');
 opts.networkType = 'dagnn' ;
 opts.train = struct() ;
@@ -60,14 +92,22 @@ switch opts.modelType
     net = cnn_fractalnet('depth',opts.depth, 'Nclass', opts.Nclass, 'colorSpace', opts.colorSpace);      
   case 'assaf'
     net = cnn_assafnet('Nclass', opts.Nclass, 'colorSpace', opts.colorSpace, 'k', opts.k, 'usePad', opts.usePad);      
+  case 'oded'
+    net = cnn_oded_net('Nclass', opts.Nclass, 'colorSpace', opts.colorSpace, 'k', opts.k, 'usePad', opts.usePad);
   otherwise
     error('Unknown model type ''%s''.', opts.modelType) ;
 end
 
+
+allBlockTypes = cellfun( @(c) class(c), {net.layers.block}, 'UniformOutput', false);
+lossBlockInds = ismember( allBlockTypes, {'dagnn.Loss','dagnn.PDist'});
+
+
 net.meta.trainOpts.learningRate=opts.learningRate; %update lr
 net.meta.trainOpts.batchSize = opts.batchSize; %batch size
 net.meta.trainOpts.weightDecay = opts.weightDecay; %weight decay
-net.meta.trainOpts.momentum = opts.momentum ;
+% net.meta.trainOpts.momentum = opts.momentum ;
+net.meta.trainOpts = rmfield(net.meta.trainOpts,'momentum');
 net.meta.trainOpts.numEpochs = numel(net.meta.trainOpts.learningRate); %update num. ep.
 
 if exist(opts.imdbPath, 'file')
@@ -105,7 +145,10 @@ switch lower(opts.networkType)
   case 'simplenn'
     error('The simplenn structure is not supported for the ResNet architecture');
   case 'dagnn'
-    bopts = struct('numGpus', numel(opts.train.gpus)) ;
+    bopts = struct('numGpus', numel(opts.train.gpus),...
+                   'modelType',opts.modelType,...
+                   'numClass',opts.Nclass ...
+                    ) ;
     fn = @(x,y) getDagNNBatch(bopts,x,y) ;
 end
 
@@ -119,7 +162,18 @@ images=cropRand(images) ; %random crop for all samples
 if opts.numGpus > 0
   images = gpuArray(images) ;
 end
-inputs = {'input', images, 'label', labels} ;
+switch opts.modelType
+    case 'oded'
+        inputs2 = {};
+        if size(imdb.images.labels,1) > 1
+            labels2 = imdb.images.labels(2,batch) ;
+            inputs2 = {['label_class',num2str(2),'_',num2str(20)], labels2};
+        end
+        inputs = [{'input', images, ['label_class',num2str(1),'_',num2str(opts.numClass)], labels} inputs2];
+        
+    otherwise
+        inputs = {'input', images, 'label', labels} ;
+end
 
 % -------------------------------------------------------------------------
 function imdb = getCifar10Imdb(opts)
@@ -203,12 +257,14 @@ end
 
 data = cell(1, numel(files));
 labels = cell(1, numel(files));
+
 sets = cell(1, numel(files));
 for fi = 1:numel(files)
   fd = load(files{fi}) ;
   data{fi} = permute(reshape(fd.data',32,32,3,[]),[2 1 3 4]) ;
   labels{fi} = fd.fine_labels' + 1; % Index from 1
-  sets{fi} = repmat(file_set(fi), size(labels{fi}));
+  labels{fi}(2,:) = fd.coarse_labels' + 1; % Index from 1
+  sets{fi} = repmat(file_set(fi), 1, size(labels{fi},2));
 end
 
 set = cat(2, sets{:});
@@ -217,16 +273,21 @@ data = single(cat(4, data{:}));
 %pad the images to crop later
 data = padarray(data,[4,4],128,'both');
 
-% remove mean
-r = data(:,:,1,set == 1);
-g = data(:,:,2,set == 1);
-b = data(:,:,3,set == 1);
-meanCifar = [mean(r(:)), mean(g(:)), mean(b(:))];
-data = bsxfun(@minus, data, reshape(meanCifar,1,1,3));
+if opts.normImdb
+    % remove mean
+    r = data(:,:,1,set == 1);
+    g = data(:,:,2,set == 1);
+    b = data(:,:,3,set == 1);
+    meanCifar = [mean(r(:)), mean(g(:)), mean(b(:))];
+    data = bsxfun(@minus, data, reshape(meanCifar,1,1,3));
 
-%divide by std
-stdCifar = [std(r(:)), std(g(:)), std(b(:))];
-data = bsxfun(@times, data,reshape(1./stdCifar,1,1,3)) ;
+    %divide by std
+    stdCifar = [std(r(:)), std(g(:)), std(b(:))];
+    data = bsxfun(@times, data,reshape(1./stdCifar,1,1,3)) ;
+else
+    meanCifar = zeros(1,3);
+    stdCifar = ones(1,3);
+end
 
 clNames = load(fullfile(unpackPath, 'meta.mat'));
 
@@ -235,3 +296,5 @@ imdb.images.labels = single(cat(2, labels{:})) ;
 imdb.images.set = set;
 imdb.meta.sets = {'train', 'val', 'test'} ;
 imdb.meta.classes = clNames.fine_label_names;
+imdb.meta.normalization.mean_image = meanCifar;
+imdb.meta.normalization.std_image = stdCifar;

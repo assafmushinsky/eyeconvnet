@@ -13,7 +13,7 @@ addpath(fullfile(vl_rootnn, 'examples'));
 
 opts.expDir = fullfile('data','exp') ;
 opts.continue = true ;
-opts.batchSize = 256 ;
+opts.batchSize = 512 ;
 opts.numSubBatches = 1 ;
 opts.train = [] ;
 opts.val = [] ;
@@ -162,15 +162,19 @@ for epoch=start+1:opts.numEpochs
       plot(1:epoch, values','o-') ;
       xlabel('epoch') ;
       title(p,'Interpreter','none') ;
-      legend(leg,'Interpreter','none') ;
+      legend(leg,'Interpreter','none','Location','SW') ;
       grid on ;
-      w = linspace(0.3,1,size(values,2));
+            w = linspace(0,1,size(values,2));
+            w(w < 0.3) = 0;
       valm = sum(bsxfun(@times,values,w),2) ./ sum(w);
-      vals = std(values,[],2);
-      try
-          ylim([min(valm) - max(vals), max(valm) + max(vals)])
-      catch
-      end
+            vals = std(bsxfun(@times,values,w),[],2);
+            ylimVal = [min(valm) - max(vals(:)), max(valm) + max(vals(:))];
+            ylimVal(1) = min([ylimVal(1) ; values(:,end)]);
+            ylimVal(2) = max([ylimVal(2) ; values(:,end)]);
+            if all(diff(ylimVal)>0)
+                ylim(ylimVal)
+            end
+    
       if ~isempty(opts.hardNegMining) && opts.hardNegMining.rate > 0 && mod(epoch,opts.hardNegMining.rate) == 0
         pause(0.5);
         imdb = opts.hardNegMining.hFunc(net,imdb,opts.hardNegMining);
@@ -295,7 +299,7 @@ for t=1:params.batchSize:numel(subset)
   fprintf(' %.1f (%.1f) Hz', averageSpeed, currentSpeed) ;
   for f = setdiff(fieldnames(stats)', {'num', 'time'})
     f = char(f) ;
-    fprintf(' %s: %.3f', f, stats.(f)) ;
+    fprintf(' %s: %-5.3g', f, stats.(f)) ;
   end
   fprintf('\n') ;
 end

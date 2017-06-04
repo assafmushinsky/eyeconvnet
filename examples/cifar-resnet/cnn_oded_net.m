@@ -1,5 +1,5 @@
 function net = cnn_oded_net(varargin)
-opts.k = [64 128 256];
+opts.k = [32 64 128 256];
 opts.Nclass=10;%number of classses (CIFAR-10 / CIFAR-100)
 opts.colorSpace = 'rgb';
 opts.usePad = 1;
@@ -18,8 +18,8 @@ end
 leakyConst = 1e-2;
 layers = {};
 % color space transformation
-layers{end+1} = {'addConvBlk',[1 1 10],{'order',{'conv','bn','relu'},'downsample',0,'isPad',1,'bias',false}};
-layers{end+1} = {'addConvBlk',[1 1 c],{'order',{'conv','bn','relu'},'downsample',0,'isPad',1,'bias',false}};
+layers{end+1} = {'addConvBlk',[1 1 10],{'order',{'conv','bn','relu'},'downsample',0,'isPad',0,'bias',false}};
+layers{end+1} = {'addConvBlk',[1 1 c],{'order',{'conv','bn','relu'},'downsample',0,'isPad',0,'bias',false}};
 
 
 % layers{end+1} = {'addConvBlk',[3 3 32],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
@@ -27,33 +27,24 @@ layers{end+1} = {'addConvBlk',[1 1 c],{'order',{'conv','bn','relu'},'downsample'
 
 % add resnet blocks
 for iK = 1:length(opts.k)
-    layers{end+1} = {'skipStart'};
+%     layers{end+1} = {'skipStart'};
     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+%     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+    layers{end+1} = {'addConvBlk',[1 1 opts.k(iK)/2],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-%     layers{end+1} = {'addConvBlk',[1 1 opts.k(iK)/2],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-    layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-    layers{end+1} = {'skipEnd',[1 1],{'downsample',0,'order',{'conv'},'isPad',1}};
-    layers{end+1} = {'skipStart'};
-    layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-    layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-    layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-    layers{end+1} = {'skipEnd',[1 1],{'downsample',0,'order',{'conv'},'isPad',1}};
+%     layers{end+1} = {'skipEnd',[1 1],{'downsample',0,'order',{'conv'},'isPad',1}};
+%     layers{end+1} = {'skipStart'};
+%     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+%     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+%     layers{end+1} = {'addConvBlk',[3 3 opts.k(iK)],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+%     layers{end+1} = {'skipEnd',[1 1],{'downsample',0,'order',{'conv'},'isPad',1}};
     layers{end+1} = {'pooling', [2 2], 2};
 end
-% layers{end+1} = {'skipStart'};
-% layers{end+1} = {'addConvBlk',[3 3 128],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'addConvBlk',[1 1 64],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'addConvBlk',[3 3 128],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'skipEnd',1,{'downsample',0,'order',{'conv'},'isPad',1}};
-% layers{end+1} = {'pooling', [2 2], 2};
-% layers{end+1} = {'skipStart'};
-% layers{end+1} = {'addConvBlk',[3 3 256],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'addConvBlk',[1 1 128],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'addConvBlk',[3 3 256],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
-% layers{end+1} = {'skipEnd',1,{'downsample',0,'order',{'conv'},'isPad',1}};
-% layers{end+1} = {'pooling', [2 2], 2};
 
 layers{end} = {'pooling', [4 4], 1, 'avg'};
+
+% layers{end+1} = {'addConvBlk',[1 1 opts.k(iK)*2],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
+% layers{end+1} = {'addConvBlk',[1 1 opts.k(iK)*2],{'order',{'conv','bn','relu'},'downsample',0,'leak',leakyConst,'isPad',1,'bias',false}};
 
 net = buildNet(layers,'inputSize',[32 32 3],'batchNormalization',true);
 
@@ -62,11 +53,16 @@ net = buildNet(layers,'inputSize',[32 32 3],'batchNormalization',true);
 c = opts.k(end);
 
 %% add losses
-
-lossTypes = { % class, iou, bbox_regression
-    {'class',100,'softmaxlog'}
-    {'class',20,'softmaxlog'}
-    };
+if opts.Nclass == 100
+    lossTypes = { % class, iou, bbox_regression
+        {'class',100,'softmaxlog'}
+        {'class',20,'softmaxlog'}
+        };
+else
+    lossTypes = { % class, iou, bbox_regression
+        {'class',10,'softmaxlog'}
+        };
+end
     
 
 derOutputs = {};
@@ -136,12 +132,22 @@ if opts.useQR
     
     for iC = 1:length(conv3x3Inds)
         p = net.params(conv3x3Inds(iC)).value;
-        pOut = zeros(size(p),'like',p);
-        for iP = 1:size(p,4)*size(p,3)
-            pMat = p(:,:,iP);
-            [pMatQ,pMatR] = qr(pMat);
-            pOut(:,:,iP) = pMatQ * norm(pMat);
+        pSize = size(p);
+        p = reshape(p,prod(pSize(1)),prod(pSize(2:end)));
+        [u,~,v] = svd(p,'econ');
+        if all(size(u) == size(p))
+            pOut = u;
+        else
+            pOut = v';
         end
+        pOut = reshape(pOut,pSize) * norm(p);
+        
+%         pOut = zeros(size(p),'like',p);
+%         for iP = 1:size(p,4)*size(p,3)
+%             pMat = p(:,:,iP);
+%             [pMatQ,pMatR] = qr(pMat);
+%             pOut(:,:,iP) = pMatQ * norm(pMat);
+%         end
         net.params(conv3x3Inds(iC)).value = pOut;
     end
 end

@@ -61,6 +61,7 @@ opts.instanceWeights = [] ;
 opts.normed = false ;
 opts.hinge = 0;
 opts.hard_samples_percent = [];
+opts.maxDist = inf;
 backMode = numel(varargin) > 0 && ~ischar(varargin{1}) ;
 if backMode
     dzdy = varargin{1} ;
@@ -76,8 +77,9 @@ end
 
 d = bsxfun(@minus, x, x0) ;
 d(isnan(x0)) = 0;
-if backMode, d(abs(d) < opts.hinge) = 0; end;
-if opts.normed, d = bsxfun(@rdivide, d, (x0+~x0)); end;
+if backMode, d = sign(d) .* min(abs(d),opts.maxDist); end
+if backMode, d(abs(d) < opts.hinge) = 0; end
+if opts.normed, d = bsxfun(@rdivide, d, (x0+~x0)); end
 
 if ~isempty(dzdy) && ~isempty(opts.hard_samples_percent)
     absd = abs(d) ;
@@ -151,7 +153,8 @@ if isempty(dzdy)
         y1 = bsxfun(@times, opts.instanceWeights, y1) ;
     end
     if opts.aggregate
-        y1 = sum(sum(y1)) ;
+%         y1 = sum(sum(y1)) ;
+        y1 = sum(y1(:)) ;
     end
 end
 if ~isempty(dzdy), y2 = -y1; end

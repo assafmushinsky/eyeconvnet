@@ -23,5 +23,6 @@ if nargin < 3, dzdy = []; end;
 if isempty(dzdy)
   y = reshape(inputs, inSize(1), inSize(2), inSize(3), []); %vectorize
 else
-  y = reshape(dzdy,1,1, prod(inSize), []);
+    y = reshape(dzdy, size(inputs,1),size(inputs,2),size(inputs,3), []); %vectorize
+%   y = reshape(dzdy,1,1, prod(inSize), []);
 end

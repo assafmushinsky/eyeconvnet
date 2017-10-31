@@ -77,7 +77,14 @@ end
 
 d = bsxfun(@minus, x, x0) ;
 d(isnan(x0)) = 0;
-if backMode, d(abs(d) < opts.hinge) = 0; end;
+if backMode
+    d(abs(d) < opts.hinge) = 0; 
+    if (opts.clip)
+%         d(abs(d)<opts.clipValue)=0;
+       d=((d>0)-(d<0)).*max(abs(d)-opts.clipValue,0); %no jump in loss
+    end
+    
+end
 if opts.normed, d = bsxfun(@rdivide, d, (x0+~x0)); end;
 
 if ~isempty(dzdy) && ~isempty(opts.hard_samples_percent)
@@ -102,9 +109,7 @@ if ~isempty(dzdy) && ~isempty(opts.hard_samples_percent)
     d = bsxfun(@times, d, absd >= th);
 end
 
-if (opts.clip && p==2)
-    d=max(abs(d)-opts.clipValue,0);
-end
+
 
 if ~opts.noRoot
     if isempty(dzdy)

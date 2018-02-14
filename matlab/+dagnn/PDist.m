@@ -30,7 +30,8 @@ classdef PDist < dagnn.ElementWise
         function outputs = forward(obj, inputs, params)
             outputs{1} = vl_nnpdist(inputs{1}, inputs{2}, obj.p, 'noRoot', obj.noRoot, 'epsilon', obj.epsilon, 'aggregate', obj.aggregate, 'clip',obj.clip,'clipValue',obj.clipValue, obj.opts{:}) ;
             n = obj.numAveraged ;
-            numOfNewOutputs=gather(sum(~isnan(sum(squeeze(inputs{1}-inputs{2}),1))));
+            tmpDiff=inputs{1}-inputs{2};
+            numOfNewOutputs=gather(sum(~isnan(tmpDiff(:))));
             m = n +numOfNewOutputs ;
             obj.average = (n * obj.average + gather(outputs{1})) / m ;
             obj.numAveraged = m ;

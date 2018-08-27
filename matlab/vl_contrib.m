@@ -88,6 +88,7 @@ if isempty(contribs)
   contrib_repo = repo_factory(opts.contribUrl);
   try 
     contribs_raw = webread(contrib_repo.readme_url);
+    mkdir(opts.contribDir) ;
     write_file(fullfile(opts.contribDir, 'contribs.txt'),contribs_raw) ;
   catch
     contribs_raw = read_file(fullfile(opts.contribDir, 'contribs.txt')) ;
@@ -394,7 +395,7 @@ function obj = github(url)
     sha = data.object.sha;
   end
 
-pattern = 'github\.com/(?<user>[\w]*)/(?<repo>[\w-]*)';
+pattern = 'github\.com/(?<user>[^/]*)/(?<repo>[^/]*)';
 match = regexp(url, pattern, 'names');
 if isempty(match), obj = []; return; end;
 obj.url = url;
